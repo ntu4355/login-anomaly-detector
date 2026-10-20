@@ -1,0 +1,167 @@
+{% extends "base.html" %} {% block content %}
+<h2 class="mb-4">
+  <i class="bi bi-exclamation-triangle"></i> Quản lý Cảnh báo Bất thường
+</h2>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <table class="table table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Mức độ</th>
+          <th>Tiêu đề / Mô tả</th>
+          <th>Tài khoản & IP</th>
+          <th>Thời điểm</th>
+          <th>Trạng thái</th>
+          <th style="width: 280px">Thao tác nhanh</th>
+        </tr>
+      </thead>
+      <tbody id="alerts-tbody">
+        <tr>
+          <td colspan="6" class="text-center">
+            Đang tải danh sách cảnh báo...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  document.getElementById("nav-alerts").classList.add("active");
+
+  async function loadAlerts() {
+    const res = await fetch("/api/admin/alerts");
+    const alerts = await res.json();
+    const tbody = document.getElementById("alerts-tbody");
+    tbody.innerHTML = "";
+
+    if (alerts.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="6" class="text-center">Chưa phát hiện cảnh báo nào.</td></tr>';
+      return;
+    }
+
+    alerts.forEach((a) => {
+      let sevBadge = '<span class="badge bg-warning text-dark">MEDIUM</span>';
+      if (a.severity === "HIGH")
+        sevBadge = '<span class="badge bg-danger">HIGH</span>';
+      if (a.severity === "CRITICAL")
+        sevBadge =
+          '<span class="badge bg-dark text-danger border border-danger">🚨 CRITICAL</span>';
+
+      let statusBadge = '<span class="badge bg-secondary">Chưa xử lý</span>';
+      if (a.status === "RESOLVED")
+        statusBadge = '<span class="badge bg-success">Đã xử lý</span>';
+
+      const isResolved = a.status === "RESOLVED";
+
+      tbody.innerHTML += `
+                <tr class="${isResolved ? "table-light opacity-75" : ""}">
+                    <td>${sevBadge}</td>
+                    <td>
+                        <strong>${a.title}</strong><br>
+                        <small class="text-muted">${a.description}</small>
+                        ${a.notes ? `<br><small class="text-success"><strong>Ghi chú:</strong> ${a.notes}</small>` : ""}
+                    </td>
+                    <td><strong>${a.username}</strong><br><code>${a.ip_address}</code></td>
+                    <td><small>${a.created_at}</small></td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        ${
+                          !isResolved
+                            ? `
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" onclick="ignoreAlert('${a._id}')" title="Bỏ qua cảnh báo này">
+                                👁️ Bỏ qua
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="blockIPAction('${a._id}', '${a.ip_address}')" title="Chặn IP ngay">
+                                🚫 Block IP
+                            </button>
+                            ${
+                              a.username !== "Nhiều tài khoản"
+                                ? `
+                            <button class="btn btn-outline-warning text-dark" onclick="lockUserAction('${a._id}', '${a.username}')" title="Khóa tài khoản này">
+                                🔒 Khóa User
+                            </button>`
+                                : ""
+                            }
+                        </div>
+                        `
+                            : `<span class="text-muted small"><i class="bi bi-check-all"></i> Hoàn tất</span>`
+                        }
+                    </td>
+                </tr>
+            `;
+    });
+  }
+
+  // 1. THAO TÁC BỎ QUA
+  async function ignoreAlert(alertId) {
+    await fetch("/api/admin/alerts", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: alertId,
+        status: "RESOLVED",
+        notes: "Admin chọn Bỏ qua",
+      }),
+    });
+    loadAlerts();
+  }
+
+  // 2. THAO TÁC BLOCK IP + ĐỔI TRẠNG THÁI
+  async function blockIPAction(alertId, ip) {
+    if (!confirm(`Xác nhận BLOCK IP: ${ip} và ĐÓNG CẢNH BÁO này?`)) return;
+
+    // Chặn IP
+    await fetch("/api/admin/block-ip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ip_address: ip }),
+    });
+
+    // Đổi trạng thái Cảnh báo
+    await fetch("/api/admin/alerts", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: alertId,
+        status: "RESOLVED",
+        notes: `Đã thực hiện Block IP (${ip})`,
+      }),
+    });
+
+    loadAlerts();
+  }
+
+  // 3. THAO TÁC KHÓA USER + ĐỔI TRẠNG THÁI
+  async function lockUserAction(alertId, username) {
+    if (!confirm(`Xác nhận KHÓA USER: ${username} và ĐÓNG CẢNH BÁO này?`))
+      return;
+
+    // Khóa User
+    await fetch("/api/admin/lock-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: username }),
+    });
+
+    // Đổi trạng thái Cảnh báo
+    await fetch("/api/admin/alerts", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: alertId,
+        status: "RESOLVED",
+        notes: `Đã thực hiện Khóa User (${username})`,
+      }),
+    });
+
+    loadAlerts();
+  }
+
+  setInterval(loadAlerts, 1000);
+  loadAlerts();
+</script>
+{% endblock %}

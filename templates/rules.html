@@ -1,0 +1,223 @@
+{% extends "base.html" %} {% block content %}
+<h2 class="mb-4"><i class="bi bi-gear"></i> Cấu hình Quy tắc Bảo mật</h2>
+
+<form id="rules-form">
+  <!-- QUY TẮC 1 -->
+  <div class="card mb-4 shadow-sm">
+    <div
+      class="card-header bg-dark text-white d-flex justify-content-between align-items-center"
+    >
+      <h5 class="mb-0">
+        Quy tắc 1: Đăng nhập thất bại nhiều lần (Tự động khóa tài khoản)
+      </h5>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="r1-enabled" />
+        <label class="form-check-label text-white">Bật quy tắc</label>
+      </div>
+    </div>
+    <div class="card-body row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Số lần thất bại tối đa:</label>
+        <input type="number" id="r1-max-failures" class="form-control" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Khoảng thời gian phân tích (Phút):</label>
+        <input type="number" id="r1-window" class="form-control" />
+      </div>
+    </div>
+  </div>
+
+  <!-- QUY TẮC 2 -->
+  <div class="card mb-4 shadow-sm">
+    <div
+      class="card-header bg-dark text-white d-flex justify-content-between align-items-center"
+    >
+      <h5 class="mb-0">Quy tắc 2: Đăng nhập ngoài giờ hoạt động</h5>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="r2-enabled" />
+        <label class="form-check-label text-white">Bật quy tắc</label>
+      </div>
+    </div>
+    <div class="card-body row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Giờ bắt đầu làm việc (VD: 7 = 07:00):</label>
+        <input
+          type="number"
+          id="r2-start"
+          class="form-control"
+          min="0"
+          max="23"
+        />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label"
+          >Giờ kết thúc làm việc (VD: 22 = 22:00):</label
+        >
+        <input
+          type="number"
+          id="r2-end"
+          class="form-control"
+          min="0"
+          max="23"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- QUY TẮC 3 -->
+  <div class="card mb-4 shadow-sm">
+    <div
+      class="card-header bg-dark text-white d-flex justify-content-between align-items-center"
+    >
+      <h5 class="mb-0">Quy tắc 3: Đăng nhập từ IP mới / Khỏi Whitelist</h5>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="r3-enabled" />
+        <label class="form-check-label text-white">Bật quy tắc</label>
+      </div>
+    </div>
+    <div class="card-body row g-3">
+      <div class="col-md-6">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="r3-check-list" />
+          <label class="form-check-label"
+            >Chỉ cho phép IP trong Whitelist</label
+          >
+        </div>
+        <label class="form-label"
+          >Danh sách IP cho phép (mỗi IP một dòng):</label
+        >
+        <textarea id="r3-allowed-ips" class="form-control" rows="3"></textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Số ngày đối chiếu lịch sử IP mới:</label>
+        <input type="number" id="r3-lookback" class="form-control" />
+      </div>
+    </div>
+  </div>
+
+  <!-- QUY TẮC 4 -->
+  <div class="card mb-4 shadow-sm">
+    <div
+      class="card-header bg-dark text-white d-flex justify-content-between align-items-center"
+    >
+      <h5 class="mb-0">
+        Quy tắc 4: 1 IP đăng nhập thất bại trên nhiều tài khoản
+      </h5>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="r4-enabled" />
+        <label class="form-check-label text-white">Bật quy tắc</label>
+      </div>
+    </div>
+    <div class="card-body row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Số tài khoản bị thử tối đa từ 1 IP:</label>
+        <input type="number" id="r4-max-accounts" class="form-control" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Khoảng thời gian phân tích (Phút):</label>
+        <input type="number" id="r4-window" class="form-control" />
+      </div>
+    </div>
+  </div>
+
+  <button
+    type="button"
+    class="btn btn-primary btn-lg mb-5"
+    onclick="saveRules()"
+  >
+    <i class="bi bi-save"></i> Lưu cấu hình quy tắc
+  </button>
+</form>
+
+<script>
+  document.getElementById("nav-rules").classList.add("active");
+
+  async function loadRules() {
+    const res = await fetch("/api/admin/rules");
+    const config = await res.json();
+
+    // R1
+    const r1 = config.rule_1_failed_attempts || {};
+    document.getElementById("r1-enabled").checked = r1.enabled ?? true;
+    document.getElementById("r1-max-failures").value = r1.max_failures || 5;
+    document.getElementById("r1-window").value = r1.time_window_minutes || 5;
+
+    // R2
+    const r2 = config.rule_2_off_hours || {};
+    document.getElementById("r2-enabled").checked = r2.enabled ?? true;
+    document.getElementById("r2-start").value = r2.start_hour ?? 7;
+    document.getElementById("r2-end").value = r2.end_hour ?? 22;
+
+    // R3
+    const r3 = config.rule_3_new_ip || {};
+    document.getElementById("r3-enabled").checked = r3.enabled ?? true;
+    document.getElementById("r3-check-list").checked =
+      r3.check_allowed_list ?? false;
+    document.getElementById("r3-allowed-ips").value = (
+      r3.allowed_ips || []
+    ).join("\n");
+    document.getElementById("r3-lookback").value =
+      r3.historical_lookback_days || 30;
+
+    // R4
+    const r4 = config.rule_4_multi_account_failures || {};
+    document.getElementById("r4-enabled").checked = r4.enabled ?? true;
+    document.getElementById("r4-max-accounts").value = r4.max_accounts || 5;
+    document.getElementById("r4-window").value = r4.time_window_minutes || 10;
+  }
+
+  async function saveRules() {
+    const payload = {
+      rule_1_failed_attempts: {
+        enabled: document.getElementById("r1-enabled").checked,
+        max_failures: parseInt(
+          document.getElementById("r1-max-failures").value,
+        ),
+        time_window_minutes: parseInt(
+          document.getElementById("r1-window").value,
+        ),
+        severity: "HIGH",
+      },
+      rule_2_off_hours: {
+        enabled: document.getElementById("r2-enabled").checked,
+        start_hour: parseInt(document.getElementById("r2-start").value),
+        end_hour: parseInt(document.getElementById("r2-end").value),
+        severity: "MEDIUM",
+      },
+      rule_3_new_ip: {
+        enabled: document.getElementById("r3-enabled").checked,
+        check_allowed_list: document.getElementById("r3-check-list").checked,
+        allowed_ips: document
+          .getElementById("r3-allowed-ips")
+          .value.split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        historical_lookback_days: parseInt(
+          document.getElementById("r3-lookback").value,
+        ),
+        severity: "MEDIUM",
+      },
+      rule_4_multi_account_failures: {
+        enabled: document.getElementById("r4-enabled").checked,
+        max_accounts: parseInt(
+          document.getElementById("r4-max-accounts").value,
+        ),
+        time_window_minutes: parseInt(
+          document.getElementById("r4-window").value,
+        ),
+        severity: "HIGH",
+      },
+    };
+
+    const res = await fetch("/api/admin/rules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) alert("Đã lưu cấu hình quy tắc thành công!");
+  }
+
+  loadRules();
+</script>
+{% endblock %}

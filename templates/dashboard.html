@@ -1,0 +1,164 @@
+{% extends "base.html" %} {% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2>
+    <i class="bi bi-speedometer2"></i> Dashboard Phân tích Xu hướng Tấn công
+  </h2>
+
+  <!-- Bộ lọc mốc thời gian -->
+  <div class="d-flex align-items-center bg-white p-2 rounded shadow-sm border">
+    <label class="me-2 fw-bold text-secondary mb-0"
+      ><i class="bi bi-funnel"></i> Mốc hiển thị Trục X:</label
+    >
+    <select
+      id="period-select"
+      class="form-select form-select-sm"
+      style="width: 220px"
+      onchange="loadDashboard()"
+    >
+      <option value="day" selected>Theo Ngày trong tuần (T2 - CN)</option>
+      <option value="month">Theo các Tháng (Tháng 1 - 12)</option>
+      <option value="year">Theo các Năm</option>
+    </select>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card bg-primary text-white p-3 shadow-sm">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h6>Tổng lượt truy cập hôm nay</h6>
+          <h2 id="stat-total" class="mb-0">0</h2>
+        </div>
+        <i class="bi bi-person-lines-fill fs-1 opacity-50"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-success text-white p-3 shadow-sm">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h6>Đăng nhập Thành công</h6>
+          <h2 id="stat-success" class="mb-0">0</h2>
+        </div>
+        <i class="bi bi-check-circle fs-1 opacity-50"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-danger text-white p-3 shadow-sm">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h6>Đăng nhập Thất bại</h6>
+          <h2 id="stat-failed" class="mb-0">0</h2>
+        </div>
+        <i class="bi bi-x-circle fs-1 opacity-50"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-warning text-dark p-3 shadow-sm">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h6>Cảnh báo hôm nay</h6>
+          <h2 id="stat-alerts" class="mb-0">0</h2>
+        </div>
+        <i class="bi bi-exclamation-triangle fs-1 opacity-50"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card p-4 shadow-sm">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="card-title mb-0">
+      <i class="bi bi-graph-up-arrow"></i> Đồ thị Đường So sánh Đăng nhập Thành
+      công, Thất bại & Cảnh báo
+    </h5>
+    <small class="text-muted" id="chart-description"
+      >Trục X: Thứ 2 -> Chủ nhật | Trục Y: Số lượng</small
+    >
+  </div>
+  <canvas id="loginChart" height="100"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.getElementById("nav-dashboard").classList.add("active");
+  let myChart = null;
+
+  async function loadDashboard() {
+    const period = document.getElementById("period-select").value;
+    const res = await fetch(`/api/admin/dashboard/stats?period=${period}`);
+    const data = await res.json();
+
+    // Cập nhật thẻ KPI
+    document.getElementById("stat-total").innerText = data.total;
+    document.getElementById("stat-success").innerText = data.success;
+    document.getElementById("stat-failed").innerText = data.failed;
+    document.getElementById("stat-alerts").innerText = data.alerts;
+
+    const descElem = document.getElementById("chart-description");
+    if (period === "day") {
+      descElem.innerText =
+        "Trục X: Các ngày trong tuần (Thứ 2 -> Chủ nhật) | Trục Y: Số lượng sự kiện";
+    } else if (period === "month") {
+      descElem.innerText =
+        "Trục X: 12 Tháng trong năm (Tháng 1 -> Tháng 12) | Trục Y: Số lượng sự kiện";
+    } else {
+      descElem.innerText = "Trục X: Các Năm | Trục Y: Số lượng sự kiện";
+    }
+
+    // Vẽ Biểu đồ Đường với 3 đường
+    const ctx = document.getElementById("loginChart").getContext("2d");
+    if (myChart) myChart.destroy();
+
+    myChart = new Chart(ctx, {
+      type: "line", // Biểu đồ đường
+      data: {
+        labels: data.labels,
+        datasets: [
+          {
+            label: "Đăng nhập Thành công",
+            data: data.series.success,
+            borderColor: "#198754", // Xanh lá
+            backgroundColor: "rgba(25, 135, 84, 0.1)",
+            fill: true,
+            tension: 0.3,
+          },
+          {
+            label: "Đăng nhập Thất bại (Dò Pass)",
+            data: data.series.failed,
+            borderColor: "#dc3545", // Đỏ
+            backgroundColor: "rgba(220, 53, 69, 0.1)",
+            fill: true,
+            tension: 0.3,
+          },
+          {
+            label: "Cảnh báo Bất thường (Alerts)",
+            data: data.series.alerts,
+            borderColor: "#ffc107", // Vàng
+            backgroundColor: "rgba(255, 193, 7, 0.1)",
+            fill: true,
+            tension: 0.3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        interaction: {
+          intersect: false,
+          mode: "index",
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { stepSize: 1 } },
+        },
+      },
+    });
+  }
+
+  setInterval(loadDashboard, 2000);
+  loadDashboard();
+</script>
+{% endblock %}

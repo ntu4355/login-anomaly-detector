@@ -1,0 +1,60 @@
+{% extends "base.html" %} {% block content %}
+<h2 class="mb-4"><i class="bi bi-journal-text"></i> Nhật ký Đăng nhập</h2>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <table class="table table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Thời gian</th>
+          <th>Tài khoản</th>
+          <th>Địa chỉ IP</th>
+          <th>Trạng thái</th>
+          <th>Lý do thất bại</th>
+        </tr>
+      </thead>
+      <tbody id="logs-tbody">
+        <tr>
+          <td colspan="5" class="text-center">Đang tải nhật ký...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  document.getElementById("nav-logs").classList.add("active");
+
+  async function loadLogs() {
+    const res = await fetch("/api/admin/logs");
+    const logs = await res.json();
+    const tbody = document.getElementById("logs-tbody");
+    tbody.innerHTML = "";
+
+    if (logs.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" class="text-center">Chưa có nhật ký đăng nhập nào.</td></tr>';
+      return;
+    }
+
+    logs.forEach((log) => {
+      const statusBadge =
+        log.status === "SUCCESS"
+          ? '<span class="badge bg-success">Thành công</span>'
+          : '<span class="badge bg-danger">Thất bại</span>';
+
+      tbody.innerHTML += `
+                <tr>
+                    <td>${log.timestamp}</td>
+                    <td><strong>${log.username}</strong></td>
+                    <td><code>${log.ip_address}</code></td>
+                    <td>${statusBadge}</td>
+                    <td>${log.failure_reason || "-"}</td>
+                </tr>
+            `;
+    });
+  }
+  setInterval(loadLogs, 1000);
+  loadLogs();
+</script>
+{% endblock %}
